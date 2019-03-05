@@ -51,6 +51,7 @@ import sys
 import threading
 import warnings
 import contextlib
+import functools
 from time import monotonic as _time
 
 
@@ -657,6 +658,37 @@ def _use_posix_spawn():
 _USE_POSIX_SPAWN = _use_posix_spawn()
 
 
+def _get_proc_ctime(pid):
+    """Return PID creation time on platforms that support it."""
+    if sys.platform.startswith("linux"):
+        if not os.path.exists('/proc'):
+            return None
+        try:
+            with open('/proc/%s/stat' % pid, 'rb') as f:
+                data = f.read()
+        except FileNotFoundError:
+            raise ProcessLookupError(errno.ESRCH, os.strerror(errno.ESRCH))
+        fields = data[data.rfind(b')') + 2:].split()
+        return int(fields[19])
+    else:
+        raise NotImplementedError
+
+
+def _assert_pid_not_reused(fun):
+    @functools.wraps(fun)
+    def wrapper(self, *args, **kwargs):
+        try:
+            other_ctime = _get_proc_ctime(self.pid)
+        except ProcessLookupError:
+            other_ctime = None
+        if self._ctime != other_ctime:
+            msg = "PID %s has been reused by another process" % self.pid
+            raise ProcessLookupError(errno.ESRCH, msg)
+        return fun(self, *args, **kwargs)
+    return wrapper
+
+
+
 class Popen(object):
     """ Execute a child program in a new process.
 
@@ -862,6 +894,11 @@ class Popen(object):
                         pass
 
             raise
+
+        try:
+            self._ctime = _get_proc_ctime(self.pid)
+        except ProcessLookupError:
+            self._ctime = None
 
     @property
     def universal_newlines(self):
@@ -1864,7 +1901,7 @@ class Popen(object):
                     self._input = self._input.encode(self.stdin.encoding,
                                                      self.stdin.errors)
 
-
+        @_assert_pid_not_reused
         def send_signal(self, sig):
             """Send a signal to the process."""
             # Skip signalling a process that we know has already died.

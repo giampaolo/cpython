@@ -1378,6 +1378,20 @@ class ProcessTestCase(BaseTestCase):
             subprocess.Popen(['exit', '0'], cwd='/some/nonexistent/directory')
         self.assertEqual(c.exception.filename, '/some/nonexistent/directory')
 
+    def test_pid_reused(self):
+        proc = subprocess.Popen(
+            [sys.executable, '-c', 'import time; time.sleep(10)'])
+        try:
+            with mock.patch('subprocess._get_proc_ctime', return_value=-1):
+                with self.assertRaises(ProcessLookupError) as cm:
+                    proc.kill()
+            self.assertEqual(
+                cm.exception.strerror,
+                'PID %s has been reused by another process' % proc.pid)
+        finally:
+            proc.terminate()
+            proc.wait()
+
 
 class RunFuncTestCase(BaseTestCase):
     def run_python(self, code, **kwargs):
