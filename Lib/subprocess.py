@@ -671,7 +671,7 @@ def _get_proc_ctime(pid):
         fields = data[data.rfind(b')') + 2:].split()
         return int(fields[19])
     else:
-        raise NotImplementedError
+        raise NotImplementedError("not implemented on this platform")
 
 
 def _assert_pid_not_reused(fun):
