@@ -28,6 +28,7 @@ import unittest
 import uuid
 import warnings
 from test import support
+from test.support import TESTFN
 
 try:
     import resource
@@ -79,6 +80,7 @@ else:
 
 # Issue #14110: Some tests fail on FreeBSD if the user is in the wheel group.
 HAVE_WHEEL_GROUP = sys.platform.startswith('freebsd') and os.getgid() == 0
+TESTFN2 = TESTFN + '2'
 
 
 def requires_os_func(name):
@@ -229,6 +231,152 @@ class FileTests(unittest.TestCase):
                 target_is_directory=False, dir_fd=None)
         except (NotImplementedError, OSError):
             pass  # No OS support or unprivileged user
+
+
+class FilesystemFunctionsTests(unittest.TestCase):
+
+    def setUp(self):
+        for path in (TESTFN, TESTFN2):
+            if os.path.isdir(path):
+                support.rmtree(path)
+            if os.path.exists(path):
+                support.unlink(path)
+
+    tearDown = setUp
+
+    def touch(self, fname):
+        with open(fname, "w"):
+            pass
+
+    def check_file(self, fun, *args, **kwargs):
+        self.tearDown()
+        with self.assertRaises(FileNotFoundError):
+            fun(*args, **kwargs)
+        self.touch(TESTFN)
+        fun(*args, **kwargs)
+        if os.path.exists(TESTFN):
+            assert os.path.isfile(TESTFN)
+
+    def check_dir(self, fun, *args, **kwargs):
+        self.tearDown()
+        with self.assertRaises(FileNotFoundError):
+            fun(*args, **kwargs)
+        os.mkdir(TESTFN)
+        fun(*args, **kwargs)
+        if os.path.exists(TESTFN):
+            assert os.path.isdir(TESTFN)
+
+    def test_access(self):
+        assert not os.access(TESTFN, os.R_OK)
+        self.touch(TESTFN)
+        assert os.access(TESTFN, os.R_OK)
+
+    def test_chdir(self):
+        self.check_dir(os.chdir, TESTFN)
+
+    @unittest.skipIf(not hasattr(os, "chflags"), "not supported")
+    def test_chflags(self):
+        self.check_file(os.chflags, TESTFN, mode=0o777)
+        self.check_dir(os.chflags, TESTFN, mode=0o777)
+
+    def test_chmod(self):
+        self.check_file(os.chmod, TESTFN, mode=0o777)
+        self.check_dir(os.chmod, TESTFN, mode=0o777)
+
+    @unittest.skipIf(not hasattr(os, "chroot"), "not supported")
+    def test_chroot(self):
+        with self.assertRaises(FileNotFoundError):
+            os.chroot(TESTFN)
+        self.touch(TESTFN)
+        with self.assertRaises(NotADirectoryError):
+            os.chroot(TESTFN)
+
+    @unittest.skipIf(not hasattr(os, "lchflags"), "not supported")
+    def test_lchflags(self):
+        self.check_file(os.lchflags, TESTFN, stat.UF_APPEND)
+
+    def test_link(self):
+        with self.assertRaises(FileNotFoundError):
+            os.link(TESTFN, TESTFN2)
+
+    def test_listdir(self):
+        self.check_dir(os.listdir, TESTFN)
+
+    def test_readlink(self):
+        with self.assertRaises(FileNotFoundError):
+            os.readlink(TESTFN)
+
+    def test_remove(self):
+        with self.assertRaises(FileNotFoundError):
+            os.remove(TESTFN)
+        self.touch(TESTFN)
+        os.remove(TESTFN)
+        assert not os.path.exists(TESTFN)
+
+    def test_removedirs(self):
+        with self.assertRaises(FileNotFoundError):
+            os.removedirs(TESTFN)
+
+    def test_rename(self, fun=os.rename):
+        with self.assertRaises(FileNotFoundError):
+            fun(TESTFN, TESTFN2)
+        with self.assertRaises(FileNotFoundError):
+            fun(TESTFN, TESTFN2)
+
+        # move file
+        self.touch(TESTFN)
+        fun(TESTFN, TESTFN2)
+        assert not os.path.exists(TESTFN)
+        assert os.path.isfile(TESTFN2)
+        self.tearDown()
+        # move dir
+        os.mkdir(TESTFN)
+        fun(TESTFN, TESTFN2)
+        assert not os.path.exists(TESTFN)
+        assert os.path.isdir(TESTFN2)
+
+    def test_renames(self):
+        self.test_rename(fun=os.renames)
+
+    def test_replace(self):
+        self.test_rename(fun=os.replace)
+
+    def test_rmdir(self):
+        with self.assertRaises(FileNotFoundError):
+            os.rmdir(TESTFN)
+        os.mkdir(TESTFN)
+        os.rmdir(TESTFN)
+        assert not os.path.exists(TESTFN)
+
+    def test_scandir(self):
+        with self.assertRaises(FileNotFoundError):
+            list(os.scandir(TESTFN))
+        os.mkdir(TESTFN)
+        list(os.scandir(TESTFN))
+
+    def test_stat(self):
+        self.check_file(os.stat, TESTFN)
+        self.check_dir(os.stat, TESTFN)
+
+    @unittest.skipIf(not hasattr(os, "statvs"), "not supported")
+    def test_statvs(self):
+        self.check_file(os.statvs, TESTFN)
+        self.check_dir(os.statvs, TESTFN)
+
+    def test_truncate(self):
+        self.check_file(os.truncate, TESTFN, 0)
+        os.remove(TESTFN)
+        os.mkdir(TESTFN)
+        with self.assertRaises(IsADirectoryError):
+            os.truncate(TESTFN, 0)
+
+    def test_utime(self):
+        self.check_file(os.utime, TESTFN)
+        self.check_dir(os.stat, TESTFN)
+
+    def test_listxattr(self):
+        self.check_file(os.listxattr, TESTFN)
+        self.check_dir(os.listxattr, TESTFN)
 
 
 # Test attributes on return values from os.*stat* family.
@@ -3795,4 +3943,4 @@ if hasattr(os, "_fspath"):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(verbosity=2)
