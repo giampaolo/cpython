@@ -61,7 +61,7 @@ class Base(unittest.TestCase):
         return ret
 
 
-class OSFunctions(Base):
+class OsFunctions(Base):
 
     # def test_access(self):
     #     assert not os.access(TESTFN, os.R_OK)
@@ -74,10 +74,21 @@ class OSFunctions(Base):
                 safe_mkdir(path)
                 self.check_dir(os.chdir, path)
 
-    # @unittest.skipIf(not hasattr(os, "chflags"), "not supported")
-    # def test_chflags(self):
-    #     self.check_file(os.chflags, TESTFN, mode=0o777)
-    #     self.check_dir(os.chflags, TESTFN, mode=0o777)
+    def test_listdir(self):
+        for path in ALL_PATHS:
+            with self.subTest(path=path):
+                safe_mkdir(path)
+                self.check_dir(os.listdir, path)
+                touch(path)
+                self.assertRaises(NotADirectoryError, os.listdir, path)
+
+    def test_scandir(self):
+        for path in ALL_PATHS:
+            with self.subTest(path=path):
+                safe_mkdir(path)
+                self.check_dir(lambda p: list(os.scandir(p)), path)
+                touch(path)
+                self.assertRaises(NotADirectoryError, os.scandir, path)
 
     def test_chmod(self):
         for path in ALL_PATHS:
@@ -86,6 +97,11 @@ class OSFunctions(Base):
                 self.check_dir(os.chmod, path, mode=0o777)
                 touch(path)
                 self.check_file(os.chmod, path, mode=0o777)
+
+    # @unittest.skipIf(not hasattr(os, "chflags"), "not supported")
+    # def test_chflags(self):
+    #     self.check_file(os.chflags, TESTFN, mode=0o777)
+    #     self.check_dir(os.chflags, TESTFN, mode=0o777)
 
     @unittest.skipIf(not hasattr(os, "chroot"), "not supported")
     @unittest.skipIf(hasattr(os, "getuid") and os.getuid() == 0,
@@ -108,32 +124,21 @@ class OSFunctions(Base):
     #     with self.assertRaises(FileNotFoundError):
     #         os.link(TESTFN, TESTFN2)
 
-    def test_listdir(self):
-        for path in ALL_PATHS:
-            with self.subTest(path=path):
-                safe_mkdir(path)
-                self.check_dir(os.listdir, path)
-                touch(path)
-                self.assertRaises(NotADirectoryError, os.listdir, path)
-
-    def test_scandir(self):
-        for path in ALL_PATHS:
-            with self.subTest(path=path):
-                safe_mkdir(path)
-                self.check_dir(lambda p: list(os.scandir(p)), path)
-                touch(path)
-                self.assertRaises(NotADirectoryError, os.scandir, path)
-
     # def test_readlink(self):
     #     with self.assertRaises(FileNotFoundError):
     #         os.readlink(TESTFN)
 
-    # def test_remove(self):
-    #     with self.assertRaises(FileNotFoundError):
-    #         os.remove(TESTFN)
-    #     touch(TESTFN)
-    #     os.remove(TESTFN)
-    #     assert not os.path.exists(TESTFN)
+    def test_remove(self):
+        for path in ALL_PATHS:
+            with self.subTest(path=path):
+                touch(path)
+                self.check_file(os.remove, path)
+
+    def test_rmdir(self):
+        for path in ALL_PATHS:
+            with self.subTest(path=path):
+                safe_mkdir(path)
+                self.check_dir(os.rmdir, path)
 
     # def test_removedirs(self):
     #     with self.assertRaises(FileNotFoundError):
@@ -162,13 +167,6 @@ class OSFunctions(Base):
 
     # def test_replace(self):
     #     self.test_rename(fun=os.replace)
-
-    # def test_rmdir(self):
-    #     with self.assertRaises(FileNotFoundError):
-    #         os.rmdir(TESTFN)
-    #     safe_mkdir(TESTFN)
-    #     os.rmdir(TESTFN)
-    #     assert not os.path.exists(TESTFN)
 
     # def test_scandir(self):
     #     with self.assertRaises(FileNotFoundError):
