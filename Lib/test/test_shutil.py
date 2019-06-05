@@ -2443,23 +2443,10 @@ class TestReflink(unittest.TestCase):
     def test_reflink(self):
         try:
             shutil.reflink(TESTFN, TESTFN2)
-        except OSError as err:
-            if sys.platform.startswith('linux'):
-                self.assertIn(err.errno, (errno.EBADF, errno.EOPNOTSUPP,
-                                          errno.ETXTBSY, errno.EXDEV))
-            else:
-                self.assertIn(err.errno, (errno.ENOTSUP, errno.EXDEV))
+        except shutil.ReflinkNotSupportedError:
+            self.skipTest('reflink not supported')
         else:
             self.assert_files_eq(TESTFN, TESTFN2)
-
-    def test_reflink_fallback(self):
-        shutil.reflink(TESTFN, TESTFN2, fallback=shutil.copyfile)
-        self.assert_files_eq(TESTFN, TESTFN2)
-
-    def test_reflink_no_file(self):
-        with self.assertRaises(EnvironmentError) as cm:
-            shutil.reflink(TESTFN + '???', TESTFN2)
-        self.assertEqual(cm.exception.errno, errno.ENOENT)
 
 
 class PublicAPITests(unittest.TestCase):

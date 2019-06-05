@@ -89,6 +89,11 @@ class RegistryError(Exception):
     """Raised when a registry operation with the archiving
     and unpacking registries fails"""
 
+class ReflinkNotSupportedError(Error):
+    """Raised by reflink() in case the file-system does not support
+    reflinks."""
+
+
 class _GiveupOnFastCopy(Exception):
     """Raised as a signal to fallback on using raw read()/write()
     file copy when fast-copy functions fail to do so.
@@ -209,17 +214,14 @@ def copyfileobj(fsrc, fdst, length=0):
 
 if _HAS_FICLONE or _HAS_CLONEFILE:
 
-    def reflink(src, dst, fallback=None):
+    def reflink(src, dst):
         """Perform a lightweight copy of two files, where the data
         blocks are copied only when modified.
 
         This is also known as CoW (Copy on Write), instantaneous copy
         or reflink, and it's the same as "cp --reflink $src $dst"
         on Linux. If the filesystem does not support CoW this function
-        will fail with ENOTSUP unless a *fallback* function is
-        specified:
-
-            >>> reflink(src, dst, fallback=copyfile)
+        will raise ReflinkNotSupportedError.
 
         Availability: Linux, macOS
         """
@@ -233,26 +235,20 @@ if _HAS_FICLONE or _HAS_CLONEFILE:
                 try:
                     fcntl.ioctl(fdst.fileno(), fcntl.FICLONE, fsrc.fileno())
                     return dst
-                except EnvironmentError as _:
-                    err = _
-                    giveup = (errno.EBADF, errno.EOPNOTSUPP, errno.ETXTBSY,
-                              errno.EXDEV)
-                    try:
-                        os.unlink(dst)
-                    except FileNotFoundError:
-                        pass
+                except EnvironmentError as err:
+                    if err.errno in (errno.EBADF, errno.EOPNOTSUPP,
+                                     errno.ETXTBSY, errno.EXDEV):
+                        raise ReflinkNotSupportedError
+                    raise
         # macOS
         else:
             try:
-                posix._clonefile(src, dst, 0)
+                posix._clonefile(src, dst, posix._CLONE_NOOWNERCOPY)
                 return dst
-            except OSError as _:
-                err = _
-                giveup = (errno.ENOTSUP, errno.EXDEV)
-
-        if fallback is not None and err.errno in giveup:
-            return fallback(src, dst)
-        raise err from None
+            except OSError as err:
+                if err.errno in (errno.ENOTSUP, errno.EXDEV):
+                    raise ReflinkNotSupportedError
+                raise
 
     __all__.append('reflink')
 

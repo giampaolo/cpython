@@ -213,8 +213,8 @@ Directory and files operations
    only when modified.
    This is also known as CoW (Copy on Write), instantaneous copy, or reflink,
    and it's the same as "cp --reflink $src $dst" on Linux.
-   If the filesystem does not support CoW this function will fail unless a
-   *fallback* function is specified.
+   If the filesystem does not support CoW this function will raise
+   :exc:`ReflinkNotSupportedError`.
 
    Availability: Linux, macOS
 

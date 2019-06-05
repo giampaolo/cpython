@@ -14198,6 +14198,10 @@ all_ins(PyObject *m)
 
 #if defined(__APPLE__)
     if (PyModule_AddIntConstant(m, "_COPYFILE_DATA", COPYFILE_DATA)) return -1;
+#ifdef HAVE_CLONEFILE
+    if (PyModule_AddIntConstant(m, "_CLONE_NOFOLLOW", CLONE_NOFOLLOW)) return -1;
+    if (PyModule_AddIntConstant(m, "_CLONE_NOOWNERCOPY", CLONE_NOOWNERCOPY)) return -1;
+#endif
 #endif
 
 #ifdef MS_WINDOWS
