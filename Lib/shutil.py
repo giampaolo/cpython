@@ -52,6 +52,7 @@ elif _WINDOWS:
 COPY_BUFSIZE = 1024 * 1024 if _WINDOWS else 64 * 1024
 _USE_CP_SENDFILE = hasattr(os, "sendfile") and sys.platform.startswith("linux")
 _HAS_FCOPYFILE = posix and hasattr(posix, "_fcopyfile")  # macOS
+_HAS_COPY_FILE_RANGE = hasattr(os, "copy_file_range")  # Linux
 
 __all__ = ["copyfileobj", "copyfile", "copymode", "copystat", "copy", "copy2",
            "copytree", "move", "rmtree", "Error", "SpecialFileError",
@@ -88,6 +89,18 @@ class _GiveupOnFastCopy(Exception):
     file copy when fast-copy functions fail to do so.
     """
 
+def _handle_cp_err(exc, fsrc, fdst, offset=None, giveup_errnos=None):
+    exc.filename = fsrc.name
+    exc.filename2 = fdst.name
+    if exc.errno == errno.ENOSPC:  # filesystem is full
+        raise exc from None
+    if exc.errno in (giveup_errnos or []):
+        raise _GiveupOnFastCopy(exc)
+    # Give up on first call and if no data was copied.
+    if offset == 0 and os.lseek(fdst.fileno(), 0, os.SEEK_CUR) == 0:
+        raise _GiveupOnFastCopy(exc)
+    raise exc
+
 def _fastcopy_fcopyfile(fsrc, fdst, flags):
     """Copy a regular file content or metadata by using high-performance
     fcopyfile(3) syscall (macOS).
@@ -101,12 +114,8 @@ def _fastcopy_fcopyfile(fsrc, fdst, flags):
     try:
         posix._fcopyfile(infd, outfd, flags)
     except OSError as err:
-        err.filename = fsrc.name
-        err.filename2 = fdst.name
-        if err.errno in {errno.EINVAL, errno.ENOTSUP}:
-            raise _GiveupOnFastCopy(err)
-        else:
-            raise err from None
+        raise _handle_cp_err(err, fsrc, fdst,
+                             giveup_errnos=(errno.ENOTSUP, ))
 
 def _fastcopy_sendfile(fsrc, fdst):
     """Copy data from one regular mmap-like fd to another by using
@@ -144,29 +153,44 @@ def _fastcopy_sendfile(fsrc, fdst):
         try:
             sent = os.sendfile(outfd, infd, offset, blocksize)
         except OSError as err:
-            # ...in oder to have a more informative exception.
-            err.filename = fsrc.name
-            err.filename2 = fdst.name
-
             if err.errno == errno.ENOTSOCK:
                 # sendfile() on this platform (probably Linux < 2.6.33)
                 # does not support copies between regular files (only
                 # sockets).
                 _USE_CP_SENDFILE = False
-                raise _GiveupOnFastCopy(err)
-
-            if err.errno == errno.ENOSPC:  # filesystem is full
-                raise err from None
-
-            # Give up on first call and if no data was copied.
-            if offset == 0 and os.lseek(outfd, 0, os.SEEK_CUR) == 0:
-                raise _GiveupOnFastCopy(err)
-
-            raise err
+            raise _handle_cp_err(err, fsrc, fdst, offset)
         else:
             if sent == 0:
                 break  # EOF
             offset += sent
+
+def _fastcopy_copy_file_range(fsrc, fdst):
+    """Copy data from one regular mmap-like fd to another by using
+    high-performance copy_file_range(2) syscall.
+    Requires Linux + glibc 2.27.
+    """
+    try:
+        fdin = fsrc.fileno()
+        fdout = fdst.fileno()
+    except Exception as err:
+        raise GiveupOnFastCopy(err)  # not a regular file
+
+    try:
+        fsize = os.fstat(fdin).st_size
+    except Exception as err:
+        raise _GiveupOnFastCopy(err)
+
+    offset = 0
+    while True:
+        try:
+            sent = os.copy_file_range(fdin, fdout, fsize, offset_src=offset)
+        except OSError as err:
+            raise _handle_cp_err(err, fsrc, fdst, offset,
+                                 giveup_errnos=(errno.ENOTSUP, ))
+        else:
+            offset += sent
+            if offset >= fsize or sent == 0:
+                break  # EOF
 
 def _copyfileobj_readinto(fsrc, fdst, length=COPY_BUFSIZE):
     """readinto()/memoryview() based variant of copyfileobj().
@@ -257,6 +281,14 @@ def copyfile(src, dst, *, follow_symlinks=True):
             if _HAS_FCOPYFILE:
                 try:
                     _fastcopy_fcopyfile(fsrc, fdst, posix._COPYFILE_DATA)
+                    return dst
+                except _GiveupOnFastCopy:
+                    pass
+            # Linux
+            elif _HAS_COPY_FILE_RANGE:
+                # can provide server-side copy (differently from sendfile())
+                try:
+                    _fastcopy_copy_file_range(fsrc, fdst)
                     return dst
                 except _GiveupOnFastCopy:
                     pass

@@ -2221,6 +2221,17 @@ class TestZeroCopySendfile(_ZeroCopyFileTest, unittest.TestCase):
     def zerocopy_fun(self, fsrc, fdst):
         return shutil._fastcopy_sendfile(fsrc, fdst)
 
+    def test_unhandled_exception(self):
+        orig = shutil._HAS_COPY_FILE_RANGE
+        shutil._HAS_COPY_FILE_RANGE = False
+        try:
+            with unittest.mock.patch(self.PATCHPOINT,
+                                     side_effect=ZeroDivisionError):
+                self.assertRaises(ZeroDivisionError,
+                                  shutil.copyfile, TESTFN, TESTFN2)
+        finally:
+            shutil._HAS_COPY_FILE_RANGE = orig
+
     def test_non_regular_file_src(self):
         with io.BytesIO(self.FILEDATA) as src:
             with open(TESTFN2, "wb") as dst:
@@ -2294,22 +2305,27 @@ class TestZeroCopySendfile(_ZeroCopyFileTest, unittest.TestCase):
         self.assertEqual(read_file(TESTFN2, binary=True), self.FILEDATA)
 
     def test_blocksize_arg(self):
-        with unittest.mock.patch('os.sendfile',
-                                 side_effect=ZeroDivisionError) as m:
-            self.assertRaises(ZeroDivisionError,
-                              shutil.copyfile, TESTFN, TESTFN2)
-            blocksize = m.call_args[0][3]
-            # Make sure file size and the block size arg passed to
-            # sendfile() are the same.
-            self.assertEqual(blocksize, os.path.getsize(TESTFN))
-            # ...unless we're dealing with a small file.
-            support.unlink(TESTFN2)
-            write_file(TESTFN2, b"hello", binary=True)
-            self.addCleanup(support.unlink, TESTFN2 + '3')
-            self.assertRaises(ZeroDivisionError,
-                              shutil.copyfile, TESTFN2, TESTFN2 + '3')
-            blocksize = m.call_args[0][3]
-            self.assertEqual(blocksize, 2 ** 23)
+        orig = shutil._HAS_COPY_FILE_RANGE
+        shutil._HAS_COPY_FILE_RANGE = False
+        try:
+            with unittest.mock.patch('os.sendfile',
+                                     side_effect=ZeroDivisionError) as m:
+                self.assertRaises(ZeroDivisionError,
+                                  shutil.copyfile, TESTFN, TESTFN2)
+                blocksize = m.call_args[0][3]
+                # Make sure file size and the block size arg passed to
+                # sendfile() are the same.
+                self.assertEqual(blocksize, os.path.getsize(TESTFN))
+                # ...unless we're dealing with a small file.
+                support.unlink(TESTFN2)
+                write_file(TESTFN2, b"hello", binary=True)
+                self.addCleanup(support.unlink, TESTFN2 + '3')
+                self.assertRaises(ZeroDivisionError,
+                                  shutil.copyfile, TESTFN2, TESTFN2 + '3')
+                blocksize = m.call_args[0][3]
+                self.assertEqual(blocksize, 2 ** 23)
+        finally:
+            shutil._HAS_COPY_FILE_RANGE = orig
 
     def test_file2file_not_supported(self):
         # Emulate a case where sendfile() only support file->socket
@@ -2331,6 +2347,14 @@ class TestZeroCopySendfile(_ZeroCopyFileTest, unittest.TestCase):
                 assert not m.called
         finally:
             shutil._USE_CP_SENDFILE = True
+
+
+# @unittest.skipIf(not MACOS, 'macOS only')
+class TestZeroCopyCopyFileRange(_ZeroCopyFileTest, unittest.TestCase):
+    PATCHPOINT = "os.copy_file_range"
+
+    def zerocopy_fun(self, src, dst):
+        return shutil._fastcopy_copy_file_range(src, dst)
 
 
 @unittest.skipIf(not MACOS, 'macOS only')
