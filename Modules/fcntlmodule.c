@@ -15,6 +15,12 @@
 #include <stropts.h>
 #endif
 
+#if defined __linux__
+#if !defined FICLONE
+#define FICLONE _IOW(0x94, 9, int)
+#endif
+#endif
+
 /*[clinic input]
 module fcntl
 [clinic start generated code]*/
@@ -628,6 +634,9 @@ all_ins(PyObject* m)
     if (PyModule_AddIntMacro(m, F_SEAL_SHRINK)) return -1;
     if (PyModule_AddIntMacro(m, F_SEAL_GROW)) return -1;
     if (PyModule_AddIntMacro(m, F_SEAL_WRITE)) return -1;
+#endif
+#ifdef FICLONE
+    if (PyModule_AddIntMacro(m, FICLONE)) return -1;
 #endif
     return 0;
 }

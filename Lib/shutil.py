@@ -48,10 +48,15 @@ if os.name == 'posix':
     import posix
 elif _WINDOWS:
     import nt
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 
 COPY_BUFSIZE = 1024 * 1024 if _WINDOWS else 64 * 1024
 _USE_CP_SENDFILE = hasattr(os, "sendfile") and sys.platform.startswith("linux")
 _HAS_FCOPYFILE = posix and hasattr(posix, "_fcopyfile")  # macOS
+_HAS_FICLONE = fcntl is not None and hasattr(fcntl, 'FICLONE')
 
 __all__ = ["copyfileobj", "copyfile", "copymode", "copystat", "copy", "copy2",
            "copytree", "move", "rmtree", "Error", "SpecialFileError",
@@ -199,6 +204,49 @@ def copyfileobj(fsrc, fdst, length=0):
         if not buf:
             break
         fdst_write(buf)
+
+
+if _HAS_FICLONE:
+
+    def reflink(src, dst, fallback=None):
+        """Perform a lightweight copy of two files, where the data
+        blocks are copied only when modified.
+
+        This is also known as CoW (Copy on Write), instantaneous copy
+        or reflink, and it's the same as "cp --reflink $src $dst"
+        on Linux. If the filesystem does not support CoW this function
+        will fail with ENOTSUP unless a *fallback* function is
+        specified:
+
+            >>> reflink(src, dst, fallback=copyfile)
+
+        Availability: Linux
+        """
+        if _samefile(src, dst):
+            raise SameFileError(
+                "{!r} and {!r} are the same file".format(src, dst))
+
+        # Linux
+        if _HAS_FICLONE:
+            with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
+                try:
+                    fcntl.ioctl(fdst.fileno(), fcntl.FICLONE, fsrc.fileno())
+                    return dst
+                except EnvironmentError as _:
+                    err = _
+                    giveup = (errno.EBADF, errno.EOPNOTSUPP, errno.ETXTBSY,
+                              errno.EXDEV)
+                    try:
+                        os.unlink(dst)
+                    except FileNotFoundError:
+                        pass
+
+        if fallback is not None and err.errno in giveup:
+            return fallback(src, dst)
+        raise err from None
+
+    __all__.append('reflink')
+
 
 def _samefile(src, dst):
     # Macintosh, Unix.

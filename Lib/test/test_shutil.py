@@ -2419,6 +2419,49 @@ class TermsizeTests(unittest.TestCase):
             self.assertEqual(size.lines, 40)
 
 
+@unittest.skipIf(not hasattr(shutil, "reflink"), "not supported")
+class TestReflink(unittest.TestCase):
+    FILESIZE = 2 * 1024 * 1024
+
+    @classmethod
+    def setUpClass(cls):
+        write_test_file(TESTFN, cls.FILESIZE)
+
+    @classmethod
+    def tearDownClass(cls):
+        support.unlink(TESTFN)
+        support.unlink(TESTFN2)
+
+    def tearDown(self):
+        support.unlink(TESTFN2)
+
+    def assert_files_eq(self, src, dst):
+        with open(src, 'rb') as fsrc:
+            with open(dst, 'rb') as fdst:
+                self.assertEqual(fsrc.read(), fdst.read())
+
+    def test_reflink(self):
+        try:
+            shutil.reflink(TESTFN, TESTFN2)
+        except OSError as err:
+            if sys.platform.startswith('linux'):
+                self.assertIn(err.errno, (errno.EBADF, errno.EOPNOTSUPP,
+                                          errno.ETXTBSY, errno.EXDEV))
+            else:
+                self.assertIn(err.errno, (errno.ENOTSUP, errno.EXDEV))
+        else:
+            self.assert_files_eq(TESTFN, TESTFN2)
+
+    def test_reflink_fallback(self):
+        shutil.reflink(TESTFN, TESTFN2, fallback=shutil.copyfile)
+        self.assert_files_eq(TESTFN, TESTFN2)
+
+    def test_reflink_no_file(self):
+        with self.assertRaises(EnvironmentError) as cm:
+            shutil.reflink(TESTFN + '???', TESTFN2)
+        self.assertEqual(cm.exception.errno, errno.ENOENT)
+
+
 class PublicAPITests(unittest.TestCase):
     """Ensures that the correct values are exposed in the public API."""
 
@@ -2434,6 +2477,8 @@ class PublicAPITests(unittest.TestCase):
                       'get_terminal_size', 'SameFileError']
         if hasattr(os, 'statvfs') or os.name == 'nt':
             target_api.append('disk_usage')
+        if hasattr(shutil, 'reflink'):
+            target_api.append('reflink')
         self.assertEqual(set(shutil.__all__), set(target_api))
 
 
