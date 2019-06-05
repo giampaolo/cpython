@@ -207,6 +207,18 @@ Directory and files operations
    :func:`copytree`\'s *ignore* argument, ignoring files and directories that
    match one of the glob-style *patterns* provided.  See the example below.
 
+.. function:: reflink(src, dst, fallback=None)
+
+   Perform a lightweight copy of a file, where the data blocks are copied
+   only when modified.
+   This is also known as CoW (Copy on Write), instantaneous copy, or reflink,
+   and it's the same as "cp --reflink $src $dst" on Linux.
+   If the filesystem does not support CoW this function will fail unless a
+   *fallback* function is specified.
+
+   Availability: Linux, macOS
+
+   .. versionadded:: 3.9
 
 .. function:: copytree(src, dst, symlinks=False, ignore=None, \
               copy_function=copy2, ignore_dangling_symlinks=False, \

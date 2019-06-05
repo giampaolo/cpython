@@ -221,7 +221,7 @@ if _HAS_FICLONE or _HAS_CLONEFILE:
 
             >>> reflink(src, dst, fallback=copyfile)
 
-        Availability: Linux
+        Availability: Linux, macOS
         """
         if _samefile(src, dst):
             raise SameFileError(
