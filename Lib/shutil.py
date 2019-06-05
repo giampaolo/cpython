@@ -56,7 +56,8 @@ except ImportError:
 COPY_BUFSIZE = 1024 * 1024 if _WINDOWS else 64 * 1024
 _USE_CP_SENDFILE = hasattr(os, "sendfile") and sys.platform.startswith("linux")
 _HAS_FCOPYFILE = posix and hasattr(posix, "_fcopyfile")  # macOS
-_HAS_FICLONE = fcntl is not None and hasattr(fcntl, 'FICLONE')
+_HAS_FICLONE = fcntl and hasattr(fcntl, 'FICLONE')
+_HAS_CLONEFILE = posix and hasattr(posix, '_clonefile')
 
 __all__ = ["copyfileobj", "copyfile", "copymode", "copystat", "copy", "copy2",
            "copytree", "move", "rmtree", "Error", "SpecialFileError",
@@ -206,7 +207,7 @@ def copyfileobj(fsrc, fdst, length=0):
         fdst_write(buf)
 
 
-if _HAS_FICLONE:
+if _HAS_FICLONE or _HAS_CLONEFILE:
 
     def reflink(src, dst, fallback=None):
         """Perform a lightweight copy of two files, where the data
@@ -240,6 +241,14 @@ if _HAS_FICLONE:
                         os.unlink(dst)
                     except FileNotFoundError:
                         pass
+        # macOS
+        else:
+            try:
+                posix._clonefile(src, dst, 0)
+                return dst
+            except OSError as _:
+                err = _
+                giveup = (errno.ENOTSUP, errno.EXDEV)
 
         if fallback is not None and err.errno in giveup:
             return fallback(src, dst)

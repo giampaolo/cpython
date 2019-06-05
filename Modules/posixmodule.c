@@ -20,6 +20,11 @@
 #  pragma weak statvfs
 #  pragma weak fstatvfs
 
+#if defined(MAC_OS_X_VERSION_10_12)
+#include <sys/clonefile.h>
+#define HAVE_CLONEFILE
+#endif
+
 #endif /* __APPLE__ */
 
 #define PY_SSIZE_T_CLEAN
@@ -9109,6 +9114,32 @@ os__fcopyfile_impl(PyObject *module, int infd, int outfd, int flags)
 #endif
 
 
+#ifdef HAVE_CLONEFILE
+/*[clinic input]
+os._clonefile
+
+    src: path_t
+    dst: path_t
+    flags: int
+
+Create a reflink (macOS only).
+[clinic start generated code]*/
+
+static PyObject *
+os__clonefile_impl(PyObject *module, path_t *src, path_t *dst, int flags)
+/*[clinic end generated code: output=330df208859c712e input=08d9953339138fa4]*/
+{
+    int ret;
+
+    Py_BEGIN_ALLOW_THREADS
+    ret = clonefile(src, dst, flags);
+    Py_END_ALLOW_THREADS
+    if (ret < 0)
+        return PyErr_SetFromErrno(PyExc_OSError);
+    Py_RETURN_NONE;
+}
+#endif
+
 /*[clinic input]
 os.fstat
 
@@ -13516,6 +13547,9 @@ static PyMethodDef posix_methods[] = {
     OS_TIMES_METHODDEF
     OS__EXIT_METHODDEF
     OS__FCOPYFILE_METHODDEF
+#ifdef HAVE_CLONEFILE
+    OS__CLONEFILE_METHODDEF
+#endif
     OS_EXECV_METHODDEF
     OS_EXECVE_METHODDEF
     OS_SPAWNV_METHODDEF

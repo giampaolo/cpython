@@ -5047,6 +5047,64 @@ exit:
 
 #endif /* defined(__APPLE__) */
 
+
+#if defined(__APPLE__)
+#ifdef HAVE_CLONEFILE
+PyDoc_STRVAR(os__clonefile__doc__,
+"_clonefile($module, /, src, dst, flags)\n"
+"--\n"
+"\n"
+"Create a reflink (macOS only).");
+
+#define OS__CLONEFILE_METHODDEF    \
+    {"_clonefile", (PyCFunction)(void(*)(void))os__clonefile, METH_FASTCALL|METH_KEYWORDS, os__clonefile__doc__},
+
+static PyObject *
+os__clonefile_impl(PyObject *module, path_t *src, path_t *dst, int flags);
+
+static PyObject *
+os__clonefile(PyObject *module, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
+{
+    PyObject *return_value = NULL;
+    static const char * const _keywords[] = {"src", "dst", "flags", NULL};
+    static _PyArg_Parser _parser = {NULL, _keywords, "_clonefile", 0};
+    PyObject *argsbuf[3];
+    path_t src = PATH_T_INITIALIZE("_clonefile", "src", 0, 0);
+    path_t dst = PATH_T_INITIALIZE("_clonefile", "dst", 0, 0);
+    int flags;
+
+    args = _PyArg_UnpackKeywords(args, nargs, NULL, kwnames, &_parser, 3, 3, 0, argsbuf);
+    if (!args) {
+        goto exit;
+    }
+    if (!path_converter(args[0], &src)) {
+        goto exit;
+    }
+    if (!path_converter(args[1], &dst)) {
+        goto exit;
+    }
+    if (PyFloat_Check(args[2])) {
+        PyErr_SetString(PyExc_TypeError,
+                        "integer argument expected, got float" );
+        goto exit;
+    }
+    flags = _PyLong_AsInt(args[2]);
+    if (flags == -1 && PyErr_Occurred()) {
+        goto exit;
+    }
+    return_value = os__clonefile_impl(module, &src, &dst, flags);
+
+exit:
+    /* Cleanup for src */
+    path_cleanup(&src);
+    /* Cleanup for dst */
+    path_cleanup(&dst);
+
+    return return_value;
+}
+#endif  /* defined(__APPLE__) */
+#endif  /* defined(HAVE_CLONEFILE) */
+
 PyDoc_STRVAR(os_fstat__doc__,
 "fstat($module, /, fd)\n"
 "--\n"
@@ -8741,4 +8799,4 @@ exit:
 #ifndef OS__REMOVE_DLL_DIRECTORY_METHODDEF
     #define OS__REMOVE_DLL_DIRECTORY_METHODDEF
 #endif /* !defined(OS__REMOVE_DLL_DIRECTORY_METHODDEF) */
-/*[clinic end generated code: output=b3ae8afd275ea5cd input=a9049054013a1b77]*/
+/*[clinic end generated code: output=281b2b0bd3622707 input=a9049054013a1b77]*/
