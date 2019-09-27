@@ -839,7 +839,9 @@ def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT,
                 sock.close()
 
     if err is not None:
-        raise err
+        msg = '%s (while attempting to connect to address %r)' % \
+            (err.strerror, sa)
+        raise error(err.errno, msg) from err
     else:
         raise error("getaddrinfo returns an empty list")
 
