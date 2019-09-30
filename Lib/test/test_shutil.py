@@ -2294,7 +2294,11 @@ class TestZeroCopySendfile(_ZeroCopyFileTest, unittest.TestCase):
         def sendfile(*args, **kwargs):
             if not flag:
                 flag.append(None)
-                return orig_sendfile(*args, **kwargs)
+                fdout, fdin, offset, count = args
+                # set small *count* so that sendfile() copies less bytes
+                # than requested
+                count = 1024
+                return orig_sendfile(fdout, fdin, offset, count)
             else:
                 raise OSError(errno.EBADF, "yo")
 
@@ -2314,21 +2318,23 @@ class TestZeroCopySendfile(_ZeroCopyFileTest, unittest.TestCase):
         # sendfile() will be called repeatedly.
         with unittest.mock.patch('os.fstat', side_effect=OSError) as m:
             with self.get_files() as (src, dst):
-                shutil._fastcopy_sendfile(src, dst)
-                assert m.called
-        self.assertEqual(read_file(TESTFN2, binary=True), self.FILEDATA)
+                with self.assertRaises(_GiveupOnFastCopy):
+                    shutil._fastcopy_sendfile(src, dst)
 
     def test_small_chunks(self):
-        # Force internal file size detection to be smaller than the
-        # actual file size. We want to force sendfile() to be called
-        # multiple times, also in order to emulate a src fd which gets
-        # bigger while it is being copied.
-        mock = unittest.mock.Mock()
-        mock.st_size = 65536 + 1
-        with unittest.mock.patch('os.fstat', return_value=mock) as m:
+        # Force sendfile() to copy less bytes than requested (on each loop).
+        # We want to force sendfile() to be called multiple times. This
+        # usually happens for files > 2G.
+        def sendfile(*args, **kwargs):
+            fdout, fdin, offset, count = args
+            count = 8196
+            return orig_sendfile(fdout, fdin, offset, count)
+
+        orig_sendfile = os.sendfile
+        with unittest.mock.patch('os.sendfile', create=True,
+                                 side_effect=sendfile):
             with self.get_files() as (src, dst):
                 shutil._fastcopy_sendfile(src, dst)
-                assert m.called
         self.assertEqual(read_file(TESTFN2, binary=True), self.FILEDATA)
 
     def test_big_chunk(self):
@@ -2353,14 +2359,6 @@ class TestZeroCopySendfile(_ZeroCopyFileTest, unittest.TestCase):
             # Make sure file size and the block size arg passed to
             # sendfile() are the same.
             self.assertEqual(blocksize, os.path.getsize(TESTFN))
-            # ...unless we're dealing with a small file.
-            support.unlink(TESTFN2)
-            write_file(TESTFN2, b"hello", binary=True)
-            self.addCleanup(support.unlink, TESTFN2 + '3')
-            self.assertRaises(ZeroDivisionError,
-                              shutil.copyfile, TESTFN2, TESTFN2 + '3')
-            blocksize = m.call_args[0][3]
-            self.assertEqual(blocksize, 2 ** 23)
 
     def test_file2file_not_supported(self):
         # Emulate a case where sendfile() only support file->socket

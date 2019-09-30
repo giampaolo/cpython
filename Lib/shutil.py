@@ -130,22 +130,19 @@ def _fastcopy_sendfile(fsrc, fdst):
     except Exception as err:
         raise _GiveupOnFastCopy(err)  # not a regular file
 
-    # Hopefully the whole file will be copied in a single call.
-    # sendfile() is called in a loop 'till EOF is reached (0 return)
-    # so a bufsize smaller or bigger than the actual file size
-    # should not make any difference, also in case the file content
-    # changes while being copied.
     try:
-        blocksize = max(os.fstat(infd).st_size, 2 ** 23)  # min 8MB
-    except Exception:
-        blocksize = 2 ** 27  # 128MB
-    if not socket._can_sendfile(blocksize):
+        fsize = os.fstat(infd).st_size
+    except Exception as err:
+        raise _GiveupOnFastCopy(err)
+    if fsize == 0:
+        return
+    if not socket._can_sendfile(fsize):
         raise _GiveupOnFastCopy("file too big for a 32-bit platform")
 
     offset = 0
     while True:
         try:
-            sent = os.sendfile(outfd, infd, offset, blocksize)
+            sent = os.sendfile(outfd, infd, offset, fsize)
         except OSError as err:
             # ...in oder to have a more informative exception.
             err.filename = fsrc.name
@@ -167,9 +164,9 @@ def _fastcopy_sendfile(fsrc, fdst):
 
             raise err
         else:
-            if sent == 0:
-                break  # EOF
             offset += sent
+            if offset >= fsize or sent == 0:
+                break
 
 def _copyfileobj_readinto(fsrc, fdst, length=COPY_BUFSIZE):
     """readinto()/memoryview() based variant of copyfileobj().
