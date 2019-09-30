@@ -2314,17 +2314,15 @@ class TestZeroCopySendfile(_ZeroCopyFileTest, unittest.TestCase):
 
     def test_cant_get_size(self):
         # Emulate a case where src file size cannot be determined.
-        # Internally bufsize will be set to a small value and
-        # sendfile() will be called repeatedly.
-        with unittest.mock.patch('os.fstat', side_effect=OSError) as m:
+        with unittest.mock.patch('os.fstat', side_effect=OSError):
             with self.get_files() as (src, dst):
                 with self.assertRaises(_GiveupOnFastCopy):
                     shutil._fastcopy_sendfile(src, dst)
 
     def test_small_chunks(self):
-        # Force sendfile() to copy less bytes than requested (on each loop).
-        # We want to force sendfile() to be called multiple times. This
-        # usually happens for files > 2G.
+        # Force sendfile() to copy less bytes than the actual file size,
+        # forcing sendfile() to enter the loop (usually it happens for
+        # files > 2G).
         def sendfile(*args, **kwargs):
             fdout, fdin, offset, count = args
             count = 8196

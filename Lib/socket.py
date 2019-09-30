@@ -364,9 +364,10 @@ class socket(_socket.socket):
                 raise _GiveupOnSendfile(err)  # not a regular file
             if not fsize:
                 return 0  # empty file
-            if not _can_sendfile(fsize):
-                raise _GiveupOnSendfile("file too big for a 32-bit platform")
             blocksize = fsize if not count else count
+            if not _can_sendfile(fsize) or \
+                    count and not _can_sendfile(count + offset):
+                raise _GiveupOnSendfile("file too big for a 32-bit platform")
 
             timeout = self.gettimeout()
             if timeout == 0:
