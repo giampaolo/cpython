@@ -10,6 +10,7 @@ import stat
 import fnmatch
 import collections
 import errno
+import socket
 
 try:
     import zlib
@@ -138,6 +139,8 @@ def _fastcopy_sendfile(fsrc, fdst):
         blocksize = max(os.fstat(infd).st_size, 2 ** 23)  # min 8MB
     except Exception:
         blocksize = 2 ** 27  # 128MB
+    if not socket._can_sendfile(blocksize):
+        raise _GiveupOnFastCopy("file too big for a 32-bit platform")
 
     offset = 0
     while True:

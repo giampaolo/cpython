@@ -107,6 +107,14 @@ def _intenum_converter(value, enum_klass):
         return value
 
 
+if hasattr(os, 'sendfile'):
+    def _can_sendfile(file_size):
+        if sys.maxsize > 2 ** 32:  # 64-bit platform
+            return True
+        else:
+            return file_size < (2 ** 31) - 1
+
+
 # WSA error codes
 if sys.platform.lower().startswith("win"):
     errorTab = {}
@@ -356,6 +364,8 @@ class socket(_socket.socket):
                 raise _GiveupOnSendfile(err)  # not a regular file
             if not fsize:
                 return 0  # empty file
+            if not _can_sendfile(fsize):
+                raise _GiveupOnSendfile("file too big for a 32-bit platform")
             blocksize = fsize if not count else count
 
             timeout = self.gettimeout()
