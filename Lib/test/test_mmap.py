@@ -759,6 +759,17 @@ class MmapTests(unittest.TestCase):
         self.assertEqual(m.madvise(mmap.MADV_NORMAL, 0, 2), None)
         self.assertEqual(m.madvise(mmap.MADV_NORMAL, 0, size), None)
 
+    @unittest.skipUnless(hasattr(mmap.mmap, 'madvise'), 'needs madvise')
+    def test_mlock(self):
+        size = 2 * PAGESIZE
+        m = mmap.mmap(-1, size)
+        m.mlock()
+        m.mlock(size)
+        with self.assertRaisesRegex(ValueError, "size out of range"):
+            m.mlock(-1)
+        with self.assertRaisesRegex(ValueError, "size out of range"):
+            m.mlock(size + 1)
+
 
 class LargeMmapTests(unittest.TestCase):
 
