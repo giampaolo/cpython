@@ -125,6 +125,15 @@ that schedules a shutdown for the default executor that waits on the
 :func:`asyncio.run` has been updated to use the new :term:`coroutine`.
 (Contributed by Kyle Stanley in :issue:`34037`.)
 
+mmap
+----
+
+The :class:`mmap.mmap` class now has an :meth:`~mmap.mmap.mlock` method to
+access the ``mlock()`` system call, preventing that memory from being paged to
+the swap area.  If dealing with file, subsequent reads from this file will be
+satisfied from the cache, and not block on disk I/O (page fault).
+(Contributed by Giampaolo Rodola in :issue:`XXX`.)
+
 threading
 ---------
 

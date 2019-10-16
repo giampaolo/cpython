@@ -212,9 +212,23 @@ To map anonymous memory, -1 should be passed as the fileno along with the length
       some systems (including Linux), *start* must be a multiple of the
       :const:`PAGESIZE`.
 
-      Availability: Systems with the ``madvise()`` system call.
+      Availability: POSIX systems with the ``madvise()`` system call.
 
       .. versionadded:: 3.8
+
+
+   .. method:: mlock([length])
+
+      Lock memory into RAM, preventing that memory from being paged to the swap
+      area.  If dealing with file, subsequent reads from this file will be
+      satisfied from the cache, and not block on disk I/O (page fault). If
+      *length* is omitted, the entire mapping is spanned. The number of bytes
+      that can be locked is determined by :data:`resource.RLIMIT_MEMLOCK`  and
+      can be increased with :func:`resource.setrlimit`.
+
+      Availability: POSIX
+
+      .. versionadded:: 3.9
 
 
    .. method:: move(dest, src, count)
