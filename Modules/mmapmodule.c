@@ -748,6 +748,28 @@ mmap_madvise_method(mmap_object *self, PyObject *args)
 }
 #endif // HAVE_MADVISE
 
+#ifdef HAVE_MLOCK
+static PyObject *
+mmap_mlock_method(mmap_object *self, PyObject *args)
+{
+    Py_ssize_t size = self->size;
+
+    if (!PyArg_ParseTuple(args, "|n:mlock", &size)) {
+        return NULL;
+    }
+    if (size < 0 || size > self->size) {
+        PyErr_SetString(PyExc_ValueError, "size out of range");
+        return NULL;
+    }
+
+    if (mlock(self->data, size) == -1) {
+        PyErr_SetFromErrno(PyExc_OSError);
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+#endif /* HAVE_MLOCK */
+
 static struct PyMethodDef mmap_object_methods[] = {
     {"close",           (PyCFunction) mmap_close_method,        METH_NOARGS},
     {"find",            (PyCFunction) mmap_find_method,         METH_VARARGS},
@@ -755,6 +777,9 @@ static struct PyMethodDef mmap_object_methods[] = {
     {"flush",           (PyCFunction) mmap_flush_method,        METH_VARARGS},
 #ifdef HAVE_MADVISE
     {"madvise",         (PyCFunction) mmap_madvise_method,      METH_VARARGS},
+#endif
+#ifdef HAVE_MLOCK
+    {"mlock",           (PyCFunction) mmap_mlock_method,        METH_VARARGS},
 #endif
     {"move",            (PyCFunction) mmap_move_method,         METH_VARARGS},
     {"read",            (PyCFunction) mmap_read_method,         METH_VARARGS},
