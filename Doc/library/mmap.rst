@@ -227,6 +227,8 @@ To map anonymous memory, -1 should be passed as the fileno along with the length
       determined by :data:`resource.RLIMIT_MEMLOCK` and can be increased via
       :func:`resource.setrlimit`.
       When the limit is hit :exc:`OSError` with ``ENOMEM`` is raised.
+      The memory lock is automatically removed on :meth:`close` or via
+      :meth:`munlock`.
 
       Availability: POSIX
 
