@@ -3569,7 +3569,8 @@ AC_CHECK_FUNCS(alarm accept4 setitimer getitimer bind_textdomain_codeset chown \
  if_nameindex \
  initgroups kill killpg lchown lockf linkat lstat lutimes mmap \
  memrchr mbrtowc mkdirat mkfifo \
- madvise mlock munlock mkfifoat mknod mknodat mktime mremap nice openat \
+ madvise mlock munlock mlockall munlockall \
+ mkfifoat mknod mknodat mktime mremap nice openat \
  pathconf pause pipe2 plock poll \
  posix_fallocate posix_fadvise posix_spawn posix_spawnp pread preadv preadv2 \
  pthread_condattr_setclock pthread_init pthread_kill putenv pwrite pwritev pwritev2 \

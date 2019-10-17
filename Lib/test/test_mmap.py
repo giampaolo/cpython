@@ -4,10 +4,10 @@ import unittest
 import os
 import re
 import itertools
-import resource
 import socket
 import sys
 import weakref
+import errno
 
 # Skip test if we can't import mmap.
 mmap = import_module('mmap')
@@ -778,6 +778,15 @@ class MmapTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "size out of range"):
             m.munlock(size + 1)
 
+    @unittest.skipUnless(hasattr(mmap, 'mlockall'), 'needs mlockall')
+    def test_mlockall(self):
+        if hasattr(mmap, "MCL_FUTURE"):
+            try:
+                mmap.mlockall(mmap.MCL_FUTURE)
+            except OSError as err:
+                if err.errno not in errno(errno.ENOMEM, errno.EPERM):
+                    raise
+        mmap.munlockall()
 
 class LargeMmapTests(unittest.TestCase):
 

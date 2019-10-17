@@ -794,6 +794,32 @@ mmap_munlock_method(mmap_object *self, PyObject *args)
 #endif /* HAVE_MUNLOCK */
 
 
+#ifdef HAVE_MLOCKALL
+static PyObject *
+mlockall_method(mmap_object *self, PyObject *args)
+{
+    int flags;
+
+    if (!PyArg_ParseTuple(args, "i", &flags))
+        return NULL;
+    if (mlockall(flags) == -1)
+        return PyErr_SetFromErrno(PyExc_OSError);
+    Py_RETURN_NONE;
+}
+#endif  /* HAVE_MLOCKALL */
+
+
+#ifdef HAVE_MUNLOCKALL
+static PyObject *
+munlockall_method(mmap_object *self, PyObject *unused)
+{
+    if (munlockall() == -1)
+        return PyErr_SetFromErrno(PyExc_OSError);
+    Py_RETURN_NONE;
+}
+#endif  /* HAVE_MUNLOCKALL */
+
+
 static struct PyMethodDef mmap_object_methods[] = {
     {"close",           (PyCFunction) mmap_close_method,        METH_NOARGS},
     {"find",            (PyCFunction) mmap_find_method,         METH_VARARGS},
@@ -1527,12 +1553,22 @@ setint(PyObject *d, const char *name, long value)
 }
 
 
+static PyMethodDef module_methods[] = {
+#ifdef HAVE_MLOCKALL
+    {"mlockall",         (PyCFunction) mlockall_method,      METH_VARARGS},
+#endif
+#ifdef HAVE_MUNLOCKALL
+    {"munlockall",       (PyCFunction) munlockall_method,    METH_NOARGS},
+#endif
+    {NULL, NULL}
+};
+
 static struct PyModuleDef mmapmodule = {
     PyModuleDef_HEAD_INIT,
     "mmap",
     NULL,
     -1,
-    NULL,
+    module_methods,
     NULL,
     NULL,
     NULL,
@@ -1664,6 +1700,17 @@ PyInit_mmap(void)
     setint(dict, "MADV_PROTECT", MADV_PROTECT);
 #endif
 #endif // HAVE_MADVISE
+
+    // mlockall()
+#ifdef MCL_CURRENT
+    setint(dict, "MCL_CURRENT", MCL_CURRENT);
+#endif
+#ifdef MCL_FUTURE
+    setint(dict, "MCL_FUTURE", MCL_FUTURE);
+#endif
+#ifdef MCL_ONFAULT
+    setint(dict, "MCL_ONFAULT", MCL_ONFAULT);
+#endif
 
     return module;
 }
