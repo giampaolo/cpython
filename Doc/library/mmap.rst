@@ -335,6 +335,49 @@ To map anonymous memory, -1 should be passed as the fileno along with the length
       the mmap was created with :const:`ACCESS_READ`, then writing to it will
       raise a :exc:`TypeError` exception.
 
+.. _mmap-functions:
+
+Functions
+---------
+
+.. function:: mlockall(flags)
+
+  Invokes ``mlockall()`` system call, which locks all pages mapped into the
+  address space of the calling process. *flags* must be one of the
+  :ref:`MCL_* constants <mlockall-constants>` available on the system.
+
+  Availability: POSIX (see the man page for :manpage:`mlockall(2)` for further
+  information).
+
+  .. versionadded:: 3.9
+
+.. function:: munlockall()
+
+  Invokes ``munlockall()`` system call, which unlocks all pages mapped into the
+  address space of the calling process.
+
+  Availability: POSIX (see the man page for :manpage:`munlockall(2)` for
+  further information).
+
+  .. versionadded:: 3.9
+
+
+.. _mlockall-constants:
+
+MCL_* Constants
+++++++++++++++++
+
+.. data:: MCL_CURRENT
+          MCL_FUTURE
+          MCL_ONFAULT
+
+   These options can be passed to :meth:`mlockall`.  Not every option will
+   be present on every system.
+
+   Availability: POSIX
+
+   .. versionadded:: 3.9
+
 .. _madvise-constants:
 
 MADV_* Constants
