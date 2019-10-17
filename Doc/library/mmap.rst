@@ -220,11 +220,23 @@ To map anonymous memory, -1 should be passed as the fileno along with the length
    .. method:: mlock([length])
 
       Lock memory into RAM, preventing that memory from being paged to the swap
-      area.  If dealing with file, subsequent reads from this file will be
+      area. If dealing with a file, subsequent reads from this the will be
       satisfied from the cache, and not block on disk I/O (page fault). If
-      *length* is omitted, the entire mapping is spanned. The number of bytes
-      that can be locked is determined by :data:`resource.RLIMIT_MEMLOCK`  and
-      can be increased with :func:`resource.setrlimit`.
+      *length* is omitted, the entire mapping is spanned.
+      For unprivileged processes the number of bytes that can be locked is
+      determined by :data:`resource.RLIMIT_MEMLOCK` and can be increased via
+      :func:`resource.setrlimit`.
+      When the limit is hit :exc:`OSError` with ``ENOMEM`` is raised.
+
+      Availability: POSIX
+
+      .. versionadded:: 3.9
+
+
+   .. method:: munlock([length])
+
+      Unlocks memory pages which were previously locked via :meth:`mlock`.
+      If *length* is omitted, the entire mapping is spanned.
 
       Availability: POSIX
 

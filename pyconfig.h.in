@@ -666,6 +666,9 @@
 /* Define to 1 if you have the `mlock' function. */
 #undef HAVE_MLOCK
 
+/* Define to 1 if you have the `munlock' function. */
+#undef HAVE_MUNLOCK
+
 /* Define this if you have the makedev macro. */
 #undef HAVE_MAKEDEV
 

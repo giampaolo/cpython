@@ -4,6 +4,7 @@ import unittest
 import os
 import re
 import itertools
+import resource
 import socket
 import sys
 import weakref
@@ -759,7 +760,7 @@ class MmapTests(unittest.TestCase):
         self.assertEqual(m.madvise(mmap.MADV_NORMAL, 0, 2), None)
         self.assertEqual(m.madvise(mmap.MADV_NORMAL, 0, size), None)
 
-    @unittest.skipUnless(hasattr(mmap.mmap, 'madvise'), 'needs madvise')
+    @unittest.skipUnless(hasattr(mmap.mmap, 'mlock'), 'needs mlock')
     def test_mlock(self):
         size = 2 * PAGESIZE
         m = mmap.mmap(-1, size)
@@ -769,6 +770,13 @@ class MmapTests(unittest.TestCase):
             m.mlock(-1)
         with self.assertRaisesRegex(ValueError, "size out of range"):
             m.mlock(size + 1)
+
+        m.munlock()
+        m.munlock(size)
+        with self.assertRaisesRegex(ValueError, "size out of range"):
+            m.munlock(-1)
+        with self.assertRaisesRegex(ValueError, "size out of range"):
+            m.munlock(size + 1)
 
 
 class LargeMmapTests(unittest.TestCase):
