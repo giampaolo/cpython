@@ -79,6 +79,10 @@ my_getpagesize(void)
 #  define MAP_ANONYMOUS MAP_ANON
 #endif
 
+#if defined MS_WINDOWS || (defined HAVE_MLOCK && defined HAVE_MUNLOCK)
+    #define HAS_LOCK
+#endif
+
 typedef enum
 {
     ACCESS_DEFAULT,
@@ -793,7 +797,7 @@ mmap_madvise_method(mmap_object *self, PyObject *args)
 }
 #endif // HAVE_MADVISE
 
-#if defined HAVE_MLOCK || defined MS_WINDOWS
+#ifdef HAS_LOCK
 static PyObject *
 mmap_lock_method(mmap_object *self, PyObject *args)
 {
@@ -820,7 +824,7 @@ mmap_lock_method(mmap_object *self, PyObject *args)
 #endif
     Py_RETURN_NONE;
 }
-#endif /* HAVE_MLOCK || MS_WINDOWS */
+#endif /* HAS_LOCK */
 
 
 #ifdef HAVE_MUNLOCK
