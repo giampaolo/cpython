@@ -80,7 +80,7 @@ my_getpagesize(void)
 #endif
 
 #if defined MS_WINDOWS || (defined HAVE_MLOCK && defined HAVE_MUNLOCK)
-    #define HAS_LOCK
+#  define HAS_LOCK
 #endif
 
 typedef enum
@@ -811,25 +811,22 @@ mmap_lock_method(mmap_object *self, PyObject *args)
         return NULL;
     }
 
-#ifdef HAVE_MLOCK
-    if (mlock(self->data, size) == -1) {
-        PyErr_SetFromErrno(PyExc_OSError);
+#ifdef MS_WINDOWS
+    if (VirtualLock(self->data, size) == 0) {
+        PyErr_SetFromWindowsErr(0);
         return NULL;
     }
 #else
-    if (VirtualLock(self->data, size) == 0) {
-        PyErr_SetFromWindowsErr(0);
+    if (mlock(self->data, size) == -1) {
+        PyErr_SetFromErrno(PyExc_OSError);
         return NULL;
     }
 #endif
     Py_RETURN_NONE;
 }
-#endif /* HAS_LOCK */
 
-
-#ifdef HAVE_MUNLOCK
 static PyObject *
-mmap_munlock_method(mmap_object *self, PyObject *args)
+mmap_unlock_method(mmap_object *self, PyObject *args)
 {
     Py_ssize_t size = self->size;
 
@@ -841,14 +838,20 @@ mmap_munlock_method(mmap_object *self, PyObject *args)
         return NULL;
     }
 
+#ifdef MS_WINDOWS
+    if (VirtualUnlock(self->data, size) == 0) {
+        PyErr_SetFromWindowsErr(0);
+        return NULL;
+    }
+#elif
     if (munlock(self->data, size) == -1) {
         PyErr_SetFromErrno(PyExc_OSError);
         return NULL;
     }
+#endif
     Py_RETURN_NONE;
 }
-#endif /* HAVE_MUNLOCK */
-
+#endif /* HAS_LOCK */
 
 #ifdef HAVE_MLOCKALL
 static PyObject *
@@ -884,11 +887,9 @@ static struct PyMethodDef mmap_object_methods[] = {
 #ifdef HAVE_MADVISE
     {"madvise",         (PyCFunction) mmap_madvise_method,      METH_VARARGS},
 #endif
-#if defined HAVE_MLOCK || defined MS_WINDOWS
+#ifdef HAS_LOCK
     {"lock",            (PyCFunction) mmap_lock_method,         METH_VARARGS},
-#endif
-#ifdef HAVE_MUNLOCK
-    {"munlock",         (PyCFunction) mmap_munlock_method,      METH_VARARGS},
+    {"unlock",          (PyCFunction) mmap_unlock_method,       METH_VARARGS},
 #endif
     {"move",            (PyCFunction) mmap_move_method,         METH_VARARGS},
     {"read",            (PyCFunction) mmap_read_method,         METH_VARARGS},

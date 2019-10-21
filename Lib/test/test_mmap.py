@@ -807,12 +807,11 @@ class MmapTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "size out of range"):
             m.lock(size + 1)
 
-        m.munlock()
-        m.munlock(size)
         with self.assertRaisesRegex(ValueError, "size out of range"):
-            m.munlock(-1)
+            m.unlock(-1)
         with self.assertRaisesRegex(ValueError, "size out of range"):
-            m.munlock(size + 1)
+            m.unlock(size + 1)
+        m.unlock()
 
     @unittest.skipUnless(hasattr(mmap, 'mlockall'), 'needs mlockall')
     def test_mlockall(self):
