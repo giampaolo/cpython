@@ -793,13 +793,13 @@ mmap_madvise_method(mmap_object *self, PyObject *args)
 }
 #endif // HAVE_MADVISE
 
-#ifdef HAVE_MLOCK
+#if defined HAVE_MLOCK || defined MS_WINDOWS
 static PyObject *
-mmap_mlock_method(mmap_object *self, PyObject *args)
+mmap_lock_method(mmap_object *self, PyObject *args)
 {
     Py_ssize_t size = self->size;
 
-    if (!PyArg_ParseTuple(args, "|n:mlock", &size)) {
+    if (!PyArg_ParseTuple(args, "|n:lock", &size)) {
         return NULL;
     }
     if (size < 0 || size > self->size) {
@@ -807,13 +807,20 @@ mmap_mlock_method(mmap_object *self, PyObject *args)
         return NULL;
     }
 
+#ifdef HAVE_MLOCK
     if (mlock(self->data, size) == -1) {
         PyErr_SetFromErrno(PyExc_OSError);
         return NULL;
     }
+#else
+    if (VirtualLock(self->data, size) == 0) {
+        PyErr_SetFromWindowsErr(0);
+        return NULL;
+    }
+#endif
     Py_RETURN_NONE;
 }
-#endif /* HAVE_MLOCK */
+#endif /* HAVE_MLOCK || MS_WINDOWS */
 
 
 #ifdef HAVE_MUNLOCK
@@ -873,8 +880,8 @@ static struct PyMethodDef mmap_object_methods[] = {
 #ifdef HAVE_MADVISE
     {"madvise",         (PyCFunction) mmap_madvise_method,      METH_VARARGS},
 #endif
-#ifdef HAVE_MLOCK
-    {"mlock",           (PyCFunction) mmap_mlock_method,        METH_VARARGS},
+#if defined HAVE_MLOCK || defined MS_WINDOWS
+    {"lock",            (PyCFunction) mmap_lock_method,         METH_VARARGS},
 #endif
 #ifdef HAVE_MUNLOCK
     {"munlock",         (PyCFunction) mmap_munlock_method,      METH_VARARGS},
